@@ -1,0 +1,44 @@
+
+services:
+  - type: web
+    name: ac-pay-gateway
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: node scripts/start-render-demo.js
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
+
+      - key: NODE_ENV
+        value: production
+
+      - key: YOUPI_BIND_HOST
+        value: 0.0.0.0
+
+      - key: USE_SQLITE_FALLBACK
+        value: "true"
+
+      - key: DEFAULT_PAYEE_VPA
+        value: "baqirab224@okaxis"
+
+      - key: PHONEPE_REGISTERED_MOBILE
+        value: "7620009616"
+
+      - key: DEFAULT_MERCHANT_NAME
+        value: "Alumni Cell KJSSE"
+
+      - key: ENCRYPTION_MASTER_KEY
+        generateValue: true
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: YOUPI_ALLOW_DEV_TOOLS
+        value: "false"
+
+      - key: YOUPI_EXPOSE_DEV_OTP
+        value: "false"
+
