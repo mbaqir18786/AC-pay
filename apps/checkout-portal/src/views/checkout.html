@@ -1359,7 +1359,9 @@
         } catch {}
       },
 
+      _signalsCache: null,
       collectSignals() {
+        if (this._signalsCache) return this._signalsCache;
         let canvasSig = '';
         try {
           const canvas = document.createElement('canvas');
@@ -1381,7 +1383,7 @@
           }
         } catch {}
 
-        return {
+        this._signalsCache = {
           userAgent: navigator.userAgent || '',
           platform: navigator.platform || '',
           language: navigator.language || '',
@@ -1392,87 +1394,98 @@
           webglRenderer,
           canvasSignature: canvasSig
         };
+        return this._signalsCache;
       },
 
+      _registeringPromise: null,
       async getOrRegister() {
         if (this.currentDeviceId) {
           return { deviceId: this.currentDeviceId, deviceToken: this.currentDeviceToken };
         }
-
-        // 1. Check local storage / session cache first
-        let cachedId = localStorage.getItem('ypg_device_id');
-        let cachedToken = localStorage.getItem('ypg_device_token');
-
-        // 2. Check IndexedDB persistent store
-        const stored = await this.getStoredRecord();
-        if (stored?.deviceId) {
-          this.currentDeviceId = stored.deviceId;
-          this.currentDeviceToken = stored.deviceToken;
-          localStorage.setItem('ypg_device_id', stored.deviceId);
-          if (stored.deviceToken) localStorage.setItem('ypg_device_token', stored.deviceToken);
-          return { deviceId: stored.deviceId, deviceToken: stored.deviceToken };
+        if (this._registeringPromise) {
+          return this._registeringPromise;
         }
 
-        if (cachedId) {
-          this.currentDeviceId = cachedId;
-          this.currentDeviceToken = cachedToken;
-          return { deviceId: cachedId, deviceToken: cachedToken };
-        }
+        this._registeringPromise = (async () => {
+          // 1. Check local storage / session cache first
+          let cachedId = localStorage.getItem('ypg_device_id');
+          let cachedToken = localStorage.getItem('ypg_device_token');
 
-        // 3. Generate new Web Crypto key pair
-        let publicKeyBase64 = '';
-        try {
-          if (window.crypto && window.crypto.subtle) {
-            const keyPair = await window.crypto.subtle.generateKey(
-              { name: 'ECDSA', namedCurve: 'P-256' },
-              true,
-              ['sign', 'verify']
-            );
-            const spki = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
-            const bytes = new Uint8Array(spki);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-              binary += String.fromCharCode(bytes[i]);
+          // 2. Check IndexedDB persistent store
+          const stored = await this.getStoredRecord();
+          if (stored?.deviceId) {
+            this.currentDeviceId = stored.deviceId;
+            this.currentDeviceToken = stored.deviceToken;
+            localStorage.setItem('ypg_device_id', stored.deviceId);
+            if (stored.deviceToken) localStorage.setItem('ypg_device_token', stored.deviceToken);
+            return { deviceId: stored.deviceId, deviceToken: stored.deviceToken };
+          }
+
+          if (cachedId) {
+            this.currentDeviceId = cachedId;
+            this.currentDeviceToken = cachedToken;
+            return { deviceId: cachedId, deviceToken: cachedToken };
+          }
+
+          // 3. Generate new Web Crypto key pair
+          let publicKeyBase64 = '';
+          try {
+            if (window.crypto && window.crypto.subtle) {
+              const keyPair = await window.crypto.subtle.generateKey(
+                { name: 'ECDSA', namedCurve: 'P-256' },
+                true,
+                ['sign', 'verify']
+              );
+              const spki = await window.crypto.subtle.exportKey('spki', keyPair.publicKey);
+              const bytes = new Uint8Array(spki);
+              let binary = '';
+              for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+              }
+              publicKeyBase64 = btoa(binary);
             }
-            publicKeyBase64 = btoa(binary);
+          } catch (e) {
+            console.warn('[DeviceIdentity] Web Crypto keygen fallback:', e.message);
           }
-        } catch (e) {
-          console.warn('[DeviceIdentity] Web Crypto keygen fallback:', e.message);
-        }
 
-        if (!publicKeyBase64) {
-          publicKeyBase64 = btoa(`fallback-device-key-${Math.random()}-${Date.now()}`);
-        }
+          if (!publicKeyBase64) {
+            publicKeyBase64 = btoa(`fallback-device-key-${Math.random()}-${Date.now()}`);
+          }
 
-        // 4. Register with YouPI backend
-        const signals = this.collectSignals();
-        try {
-          const resp = await fetch(`${API_BASE}/api/v1/devices/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ publicKey: publicKeyBase64, signals })
-          });
-          const data = await resp.json();
-          if (data?.deviceId) {
-            this.currentDeviceId = data.deviceId;
-            this.currentDeviceToken = data.deviceToken;
-            localStorage.setItem('ypg_device_id', data.deviceId);
-            if (data.deviceToken) localStorage.setItem('ypg_device_token', data.deviceToken);
-
-            await this.saveRecord({
-              deviceId: data.deviceId,
-              deviceToken: data.deviceToken,
-              publicKeyBase64,
-              registeredAt: new Date().toISOString()
+          // 4. Register with YouPI backend
+          const signals = this.collectSignals();
+          try {
+            const resp = await fetch(`${API_BASE}/api/v1/devices/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicKey: publicKeyBase64, signals })
             });
+            const data = await resp.json();
+            if (data?.deviceId) {
+              this.currentDeviceId = data.deviceId;
+              this.currentDeviceToken = data.deviceToken;
+              localStorage.setItem('ypg_device_id', data.deviceId);
+              if (data.deviceToken) localStorage.setItem('ypg_device_token', data.deviceToken);
 
-            return { deviceId: data.deviceId, deviceToken: data.deviceToken };
+              await this.saveRecord({
+                deviceId: data.deviceId,
+                deviceToken: data.deviceToken,
+                publicKeyBase64,
+                registeredAt: new Date().toISOString()
+              });
+
+              return { deviceId: data.deviceId, deviceToken: data.deviceToken };
+            }
+          } catch (err) {
+            console.error('[DeviceIdentity] Registration error:', err);
           }
-        } catch (err) {
-          console.error('[DeviceIdentity] Registration error:', err);
-        }
 
-        return { deviceId: null, deviceToken: null };
+          return { deviceId: null, deviceToken: null };
+        })().finally(() => {
+          this._registeringPromise = null;
+        });
+
+        return this._registeringPromise;
       }
     };
 

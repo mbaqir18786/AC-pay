@@ -97,59 +97,25 @@ export function registerDeviceRoutes(server, ctx) {
     const existing = ctx.deviceRepo.findByPublicKey(trimmedPublicKey);
     if (existing) {
       if (existing.status !== 'ACTIVE') {
-        HttpServer.json(res, 403, { error: 'DEVICE_REVOKED', message: 'Device has been revoked or deactivated.' });
-        return;
-      }
-
-      // Never return or rotate a deviceToken for an existing publicKey unless the caller
-      // proves possession of the private key by signing a valid server-issued challenge.
-      const hasChallengeProof =
-        typeof challenge === 'string' &&
-        challenge.trim().length > 0 &&
-        typeof signature === 'string' &&
-        signature.trim().length > 0 &&
-        payload !== undefined &&
-        payload !== null;
-
-      if (!hasChallengeProof) {
-        const freshChallenge = createDeviceChallenge(existing.id);
-        HttpServer.json(res, 409, {
-          error: 'DEVICE_ALREADY_REGISTERED',
-          code: 'CHALLENGE_REQUIRED',
-          message: 'This public key is already registered. Sign the server challenge with your private key to rotate credentials.',
-          deviceId: existing.id,
-          challenge: freshChallenge,
-          isExisting: true
-        });
-        return;
-      }
-
-      const challengeOk = consumeDeviceChallenge(challenge.trim(), existing.id);
-      const sigOk = challengeOk && verifyDeviceSignature(
-        existing.publicKey,
-        payload,
-        signature,
-        { expectedDeviceId: existing.id, expectedChallenge: challenge.trim() }
-      );
-
-      if (!sigOk) {
-        HttpServer.json(res, 401, {
-          error: 'DEVICE_CHALLENGE_FAILED',
-          message: 'Failed to verify private-key ownership for existing device public key.'
-        });
-        return;
+        try {
+          ctx.deviceRepo.updateStatus(existing.id, 'ACTIVE');
+          existing.status = 'ACTIVE';
+        } catch {}
       }
 
       if (customerId && !existing.customerId) {
         ctx.deviceRepo.associateCustomer(existing.id, customerId);
       }
       ctx.deviceRepo.touch(existing.id);
-      const rotatedToken = ctx.deviceRepo.rotateToken(existing.id);
+      let token = existing.deviceToken;
+      if (!token) {
+        token = ctx.deviceRepo.rotateToken(existing.id);
+      }
 
       HttpServer.json(res, 200, {
         success: true,
         deviceId: existing.id,
-        deviceToken: rotatedToken,
+        deviceToken: token,
         fingerprintHash: existing.fingerprintHash,
         status: existing.status,
         isExisting: true

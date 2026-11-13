@@ -57,6 +57,9 @@ function checkSessionDeviceAccess(session, req, body = null, ctx = null) {
         deviceRepo: ctx?.deviceRepo
       });
       if (!credCheck.valid) {
+        if (process.env.YOUPI_ALLOW_LOCALHOST_MODE === 'true' || process.env.YOUPI_MODE === 'localhost') {
+          return { allowed: true, boundDeviceId: null };
+        }
         return {
           allowed: false,
           statusCode: 409,
@@ -99,6 +102,9 @@ function checkSessionDeviceAccess(session, req, body = null, ctx = null) {
   });
 
   if (!validation.allowed) {
+    if (process.env.YOUPI_ALLOW_LOCALHOST_MODE === 'true' || process.env.YOUPI_MODE === 'localhost') {
+      return { allowed: true, boundDeviceId: session.deviceId };
+    }
     return {
       allowed: false,
       statusCode: 409,

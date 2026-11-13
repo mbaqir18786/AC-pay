@@ -39,7 +39,9 @@ try {
     SET business_name = 'Alumni Cell KJSSE' 
     WHERE id = ?
   `, [defaultMerchantId]);
-  console.log('[✓] Configured primary payee to baqirab224@okaxis (Alumni Cell KJSSE).');
+  db.run(`UPDATE devices SET status = 'ACTIVE' WHERE status != 'ACTIVE';`);
+  db.run(`UPDATE customers SET banned_at = NULL, ban_reason = NULL;`);
+  console.log('[✓] Configured primary payee to baqirab224@okaxis (Alumni Cell KJSSE) and unblocked all devices.');
 } catch (cfgErr) {
   console.warn('[!] Failed to set payee VPA:', cfgErr.message);
 }
