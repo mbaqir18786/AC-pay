@@ -27,6 +27,23 @@ const defaultApiKey = defaultMerchant?.apiKey || 'youpi_dev_api_key_for_testing_
 const defaultMerchantId = defaultMerchant?.id || '00000000-0000-0000-0000-000000000001';
 console.log('[✓] Database initialized & migrations applied.');
 
+// Ensure payee UPI ID and business name route directly to Alumni Cell KJSSE (baqirab224@okaxis)
+try {
+  db.run(`
+    UPDATE receiving_accounts 
+    SET upi_id = 'baqirab224@okaxis', payee_name = 'Alumni Cell KJSSE' 
+    WHERE merchant_id = ?
+  `, [defaultMerchantId]);
+  db.run(`
+    UPDATE merchants 
+    SET business_name = 'Alumni Cell KJSSE' 
+    WHERE id = ?
+  `, [defaultMerchantId]);
+  console.log('[✓] Configured primary payee to baqirab224@okaxis (Alumni Cell KJSSE).');
+} catch (cfgErr) {
+  console.warn('[!] Failed to set payee VPA:', cfgErr.message);
+}
+
 // Initialize KickStart tables in the production SQLite DB
 db.exec(`
   CREATE TABLE IF NOT EXISTS kickstart_registrations (
