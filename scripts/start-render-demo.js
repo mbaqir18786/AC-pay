@@ -141,6 +141,7 @@ async function handleKickStartApi(req, res, pathname, query, apiPort) {
         amount: totalRupees.toFixed(2),
         currency: 'INR',
         returnUrl,
+        autoActivate: true,
         customer: {
           fullName: fullName.trim(),
           email: cleanEmail,
@@ -175,6 +176,8 @@ async function handleKickStartApi(req, res, pathname, query, apiPort) {
       return sendJson(502, { error: 'Failed to create payment session.', details: err.message });
     }
 
+    const paymentId = gatewaySession.paymentId || gatewaySession.id || gatewaySession.sessionId;
+
     // Persist registration in SQLite
     const nowIso = new Date().toISOString();
     try {
@@ -187,7 +190,7 @@ async function handleKickStartApi(req, res, pathname, query, apiPort) {
       `, [
         regId, orderId, fullName.trim(), cleanRoll, department || '', year || '', cleanEmail, phone || '',
         JSON.stringify(distinctTicketIds), ticketNames, totalPaise, totalRupees,
-        gatewaySession.id || gatewaySession.sessionId || null,
+        paymentId || null,
         gatewaySession.checkoutUrl, nowIso, nowIso
       ]);
     } catch (dbErr) {
@@ -196,11 +199,12 @@ async function handleKickStartApi(req, res, pathname, query, apiPort) {
 
     const publicGatewayHost = req.headers['x-forwarded-host'] || req.headers.host || 'ac-pay-gateway.onrender.com';
     const publicProto = req.headers['x-forwarded-proto'] || 'https';
-    const publicCheckoutUrl = `${publicProto}://${publicGatewayHost}/checkout/${gatewaySession.id || gatewaySession.sessionId}`;
+    const publicCheckoutUrl = `${publicProto}://${publicGatewayHost}/checkout/${paymentId}`;
 
     return sendJson(200, {
       success: true,
       orderId,
+      paymentId,
       checkoutUrl: publicCheckoutUrl,
       amountRupees: totalRupees,
       selectedTickets: distinctTicketIds
