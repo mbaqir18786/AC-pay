@@ -10,6 +10,7 @@ const PUBLIC_PORT = Number(process.env.PORT || 10000);
 process.env.YOUPI_MODE = 'localhost';
 process.env.YOUPI_ALLOW_LOCALHOST_MODE = 'true';
 process.env.USE_SQLITE_FALLBACK = 'true';
+process.env.ADMIN_PIN = process.env.ADMIN_PIN || '2026';
 
 console.log('============================================================');
 console.log('🚀 Starting AC-Pay All-in-One Cloud Gateway for Render');

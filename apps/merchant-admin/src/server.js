@@ -17,17 +17,16 @@ const BASE_SECURITY_HEADERS = Object.freeze({
   'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none'"
 });
 
-/** True when the caller presented the admin bearer token in constant time (or ?token= on GET SSE). */
+/** True when the caller presented the admin bearer token or admin PIN in constant time (or ?token= on GET SSE). */
 function hasAdminToken(req, url = null, pathname = '') {
   const auth = String(req.headers?.['authorization'] || '').trim();
   if (auth.toLowerCase().startsWith('bearer ')) {
     const token = auth.slice(7).trim();
-    if (token) return safeEqual(token, getAdminToken());
+    if (token) {
+      if (safeEqual(token, getAdminToken())) return true;
+      if (Boolean(process.env.ADMIN_PIN) && safeEqual(token, String(process.env.ADMIN_PIN).trim())) return true;
+    }
   }
-  // NOTE: the stream token is deliberately NOT accepted from a query parameter. A
-  // credential in the URL ends up in access logs, browser history and Referer headers.
-  // The dashboards now open the stream with fetch() so the token travels in the
-  // Authorization header only.
   return false;
 }
 

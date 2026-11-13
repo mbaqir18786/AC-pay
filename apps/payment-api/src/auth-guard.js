@@ -58,6 +58,7 @@ export function authGuard(req, res, pathname, url) {
 
   const isBearerOk = presented && (
     safeEqual(presented, getAdminToken()) ||
+    (Boolean(process.env.ADMIN_PIN) && safeEqual(presented, String(process.env.ADMIN_PIN).trim())) ||
     (level === 'observer' && safeEqual(presented, getObserverToken()))
   );
 
@@ -71,10 +72,12 @@ export function authGuard(req, res, pathname, url) {
   return true;
 }
 
-/** True only when the request carries the admin token (observer token is not enough). */
+/** True only when the request carries the admin token or configured admin PIN (observer token is not enough). */
 export function isAdminRequest(req) {
   const presented = bearerToken(req);
-  return Boolean(presented) && safeEqual(presented, getAdminToken());
+  if (!presented) return false;
+  return safeEqual(presented, getAdminToken()) ||
+    (Boolean(process.env.ADMIN_PIN) && safeEqual(presented, String(process.env.ADMIN_PIN).trim()));
 }
 
 /**
