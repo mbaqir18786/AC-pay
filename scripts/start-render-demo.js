@@ -30,7 +30,7 @@ console.log('[✓] Database initialized & migrations applied.');
 // Ensure payee UPI ID and business name route directly to Alumni Cell KJSSE (baqirab224@okaxis)
 try {
   db.run(`
-    UPDATE receiving_accounts 
+    UPDATE payment_receiving_accounts 
     SET upi_id = 'baqirab224@okaxis', payee_name = 'Alumni Cell KJSSE' 
     WHERE merchant_id = ?
   `, [defaultMerchantId]);
