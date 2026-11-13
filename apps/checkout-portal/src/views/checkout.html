@@ -2169,9 +2169,8 @@
               clearPreservedIdentity();
               activeCustomer = null;
               activeToken = null;
-              setGatewayAuthMode(true);
-              goToAuthStep('mobile');
-              renderSavedAccountsUI();
+              updateCustomerDisplay(null);
+              setGatewayAuthMode(false);
             }
           } catch (e) {
           } finally {
@@ -2180,7 +2179,7 @@
         };
       }
 
-      // 3. Pre-Gateway Customer Authentication Gate (Preserves identity up to 1 week)
+      // 3. Direct Instant Payment (No login or WhatsApp OTP required)
       const preserved = getPreservedIdentity();
       if (preserved && preserved.token && !activeToken) {
         activeToken = preserved.token;
@@ -2190,36 +2189,17 @@
       } else if (!activeCustomer && preserved && preserved.customer) {
         activeCustomer = preserved.customer;
       }
-      const hasCustomer = Boolean(
-        (data.customer || activeCustomer) &&
-        (data.status !== 'INITIATED' || Boolean(activeToken))
-      );
 
-      if (!hasCustomer) {
-        if (data.customer && data.customer.phone) {
-          const mobInput = document.getElementById('authMobileInput');
-          if (mobInput && !mobInput.value) {
-            mobInput.value = String(data.customer.phone).replace(/\D/g, '').slice(-10);
-          }
-        }
-        setGatewayAuthMode(true);
-        const stepMob = document.getElementById('authStepMobile');
-        const isAlreadyOnMobile = stepMob && !stepMob.hidden;
-        if (!currentAuthStep || (currentAuthStep === 'mobile' && !isAlreadyOnMobile)) {
-          goToAuthStep('mobile');
-        }
-        renderSavedAccountsUI();
-        return;
-      }
-
-      // Authenticated Customer
       if (activeCustomer) {
         updateCustomerDisplay(activeCustomer);
-        // Automatically bind customer to the payment session if session is INITIATED or unbound
         if (activeToken && PAYMENT_ID && (!data.customer || data.status === 'INITIATED')) {
           window.autoBindCustomerToSession(activeCustomer.id, activeToken);
         }
+      } else {
+        updateCustomerDisplay(null);
       }
+
+      // Always enter payment gateway directly with 1-tap UPI and QR code
       setGatewayAuthMode(false);
 
       // Render psychological time-saving conversion banner
